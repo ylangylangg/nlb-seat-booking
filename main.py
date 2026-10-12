@@ -1,0 +1,272 @@
+print("RUNNING FILE:",__file__, flush=True)
+
+import os 
+import re
+import requests
+from getpass import getpass
+from playwright.sync_api import Page, TimeoutError as PWTimeout, sync_playwright, expect
+from datetime import datetime, timedelta, timezone
+from dotenv import load_dotenv
+import time
+import csv
+import json
+from pathlib import Path
+
+SETTINGS_PATH = Path(__file__).with_name("settings.json")
+
+with SETTINGS_PATH.open(encoding="utf-8") as file:
+    settings = json.load(file)
+
+BOOK_FOR = settings["BOOK_FOR"]
+BOOKING_TIME = settings["BOOKING_TIME"]
+BOOKING_DURATION = settings["BOOKING_DURATION"]
+SEAT_OPTION_1 = settings["SEAT_OPTION_1"]
+SEAT_OPTION_2 = settings["SEAT_OPTION_2"]
+
+if BOOK_FOR not in ("today", "tmr"):
+    raise ValueError('BOOK_FOR must be "today" or "tmr"')
+
+LOGIN_URL = "https://www.nlb.gov.sg/seatbooking/login/options"
+BOOKING_URL = "https://www.nlb.gov.sg/seatbooking/?loc=NLB.HBPL.3.ReadingLounge1Middle.{SEAT_OPTION_1}"
+
+USERNAME = os.environ.get("NLB_USERNAME") 
+PASSWORD = os.environ.get("NLB_PASSWORD")
+HEADLESS = os.environ.get("HEADLESS", "0") == "1" # For no visible window, set env: HEADLESS = value == "1"
+TIMEOUT_MS = 30_000
+SG_TIMEZONE = timezone(timedelta(hours=8))
+DATE_TODAY = datetime.now(SG_TIMEZONE).date()
+if BOOK_FOR == "today":
+    BOOKING_DATE = DATE_TODAY
+elif BOOK_FOR == "tomorrow":
+    BOOKING_DATE = DATE_TODAY + timedelta(days=1)
+else:
+    raise ValueError('BOOK_FOR must be "today" or "tomorrow"')
+
+
+def timestamp():
+    return datetime.now(SG_TIMEZONE).strftime("%H:%M:%S")
+
+def login(page: Page) -> None:
+    page.goto(LOGIN_URL, wait_until="domcontentloaded")
+
+    username_field = page.locator("#username")
+    password_field = page.locator("#password")
+
+    username_field.fill(USERNAME)
+    password_field.fill(PASSWORD)
+
+    page.get_by_role("button", name="CONTINUE", exact=True).click()
+
+    # verify signed in
+    expect(page).to_have_url(
+        re.compile(r"https://www.nlb.gov.sg/seatbooking/"),
+        timeout=15_000
+        )
+
+
+def pick_option(page: Page, label_pattern: str, option_text: str) -> None:
+    label_re = re.compile(label_pattern, re.I) # re.I ignores capitalisation
+
+    # note: option_text is the text iw, i.e. "1:00"
+    for locator in ( # try two ways to find the dropdown
+        page.get_by_label(label_re), 
+        page.get_by_role("combobox", name=label_re)):
+        if locator.count():
+            el = locator.first # choose the first match
+            tag = el.evaluate("e => e.tagName.toLowerCase()")
+            if tag == "select":
+                el.select_option(label=option_text)
+                return
+
+            # custom combobox: opens and picks the option
+            el.click()
+            page.get_by_role(
+                "option", # find this element
+                name=re.compile(re.escape(option_text), re.I)
+                # re.escape(option_text) treats the text literally
+                # re.compile(..., re.I) for matching rule, caps ok
+                ).first.click()
+            return
+
+            # for exact text match, simplifies to:
+            # page.get_by_role("option", name=option_text, exact=True).click()
+
+def book_seat(page: Page) -> str:
+    page.goto(BOOKING_URL, wait_until="domcontentloaded")
+
+    # Date: open calendar
+    page.get_by_role("textbox", name="Select date").click()
+    if DATE_TODAY.month != BOOKING_DATE.month:
+        page.get_by_role(
+            "button", name=DATE_TODAY.strftime("%B"), exact=True
+        ).click()
+
+        page.get_by_role(
+            "cell", name=BOOKING_DATE.strftime("%b"), exact=True
+        ).click()
+
+    page.get_by_role("button", name=str(BOOKING_DATE.day), exact=True).click()
+
+    # Time
+    page.get_by_role("textbox", name="Select time", exact=True).click()
+    page.get_by_text(BOOKING_TIME, exact=True).click()
+
+    # Duration
+    page.get_by_role("textbox", name="Select duration", exact=True).click()
+    page.get_by_text(BOOKING_DURATION, exact=True).click()
+
+    print(f"Selected for {BOOKING_DATE.strftime("%d %b")}, {BOOKING_TIME}, {BOOKING_DURATION}")
+
+    # Availability
+    page.get_by_role(
+        "button", name="Check available slots", exact=True
+    ).click()
+
+    # print("Before result click")
+    # first_panel = page.locator(".mb-1.v-card.v-card--link").first
+    # first_panel.click()
+    # print("After result click")
+
+    # Click Book
+    page.get_by_role("button", name="Book", exact=True).click()
+
+    # Open seat selector
+    selection_dialog = page.get_by_role("dialog").filter(has_text="Selection")
+    seat_input = selection_dialog.locator("input[readonly]")
+    seat_input.click()
+
+    # Recorded seat selection:
+    if page.get_by_text(f"S{SEAT_OPTION_1}", exact=True).is_visible():
+        selected_seat = f"S{SEAT_OPTION_1}"
+    elif page.get_by_text(f"S{SEAT_OPTION_2}", exact=True).is_visible():
+        selected_seat = f"S{SEAT_OPTION_2}"
+    else:
+        selected_seat = "Any available seat"
+
+    page.get_by_text(selected_seat, exact=True).click()
+
+    # Book
+    page.get_by_role("button", name="Confirm", exact=True).click()
+
+    return selected_seat
+
+def send_telegram(message):
+    token = os.environ["TELEGRAM_BOT_TOKEN"]
+    chat_id = os.environ["TELEGRAM_CHAT_ID"]
+
+    response = requests.post(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        json={"chat_id": chat_id, "text": message},
+        timeout=15,
+    )
+
+    if not response.json().get("ok"):
+        raise RuntimeError("Telegram notification failed.")
+
+def wait_until_noon():
+    now = datetime.now(SG_TIMEZONE)
+    target = now.replace(hour=12, minute=0, second=0, microsecond=5)
+
+    print("Waiting until noon Singapore time...", flush=True)
+
+    while True:
+        remaining = (target - datetime.now(SG_TIMEZONE)).total_seconds()
+
+        if remaining <= 0:
+            break
+
+        time.sleep(min(remaining, 0.1))
+
+def main() -> None:
+    script_started_at = timestamp()
+    logged_in_at = None
+    refreshed_at = None
+    booked_at = None
+    
+    if not USERNAME or not PASSWORD:
+        raise ValueError("Set NLB_USERNAME and NLB_PASSWORD first.")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=HEADLESS, # show browser while debugging
+            slow_mo=150,
+            args=["--window-size=960,1000","--window-position=0,0"]
+            )
+
+        context = browser.new_context(no_viewport=True)
+        context.grant_permissions([])  # Deny permission requests
+        context.set_default_timeout(TIMEOUT_MS)
+        page = context.new_page()
+
+        try:
+            login(page)
+            logged_in_at = timestamp()
+            send_telegram(f"login confirmed: {logged_in_at}")
+
+            if BOOK_FOR == "tmr" and datetime.now(SG_TIMEZONE).hour < 12:
+                wait_until_noon()
+                page.reload(wait_until="domcontentloaded")
+                refreshed_at = timestamp()
+
+            selected_seat = book_seat(page)
+
+            expect(
+                    page.get_by_text("Booking successful!", exact=True)
+                ).to_be_visible(timeout=15_000)
+
+            booked_at = timestamp()
+
+            # track by appending to booking_log.csv after confirmed success
+            log_path = Path("booking_log.csv")
+            needs_header = not log_path.exists() or log_path.stat().st_size == 0
+
+            with log_path.open("a", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+
+                if needs_header:
+                    writer.writerow(["date", "seat", "time", "duration"])
+
+                writer.writerow([
+                    BOOKING_DATE.isoformat(),
+                    selected_seat,
+                    BOOKING_TIME,
+                    BOOKING_DURATION,
+                ])
+
+        finally:
+            messages = []
+        
+            if logged_in_at is not None:
+                messages.append(f"login confirmed: {logged_in_at}")
+
+            if refreshed_at is not None:
+                messages.append(f"refresh DOM loaded: {refreshed_at}")
+
+            if booked_at is not None:
+                messages.append(
+                    f"☆ booking successful {booked_at}: "
+                    f"{selected_seat} for "
+                    f"{BOOKING_DATE.strftime('%d %b')}"
+                )
+            else:
+                messages.append("Booking success was not confirmed.")
+        
+            try:
+                send_telegram("\n".join(messages))
+            except Exception as notification_error:
+                print(
+                    "Telegram notification failed: "
+                    f"{type(notification_error).__name__}"
+                )
+
+            # can add a fallback if unsuccessful booking, try again, for middle tier seat S18
+        context.close()
+        browser.close()
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
