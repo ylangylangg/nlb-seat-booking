@@ -2,8 +2,8 @@ name: run booking script
 
 on:
   schedule:
-    - cron: '55 3 * * *' # At 00:00 on Monday
-  workflow_dispatch
+    - cron: '55 3 * * *' # Every day at 11:55 am Singapore time
+  workflow_dispatch:
 
 permissions:
   contents: read
