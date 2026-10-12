@@ -12,6 +12,8 @@ import csv
 import json
 from pathlib import Path
 
+load_dotenv(Path(__file__).with_name(".env"))
+
 SETTINGS_PATH = Path(__file__).with_name("settings.json")
 
 with SETTINGS_PATH.open(encoding="utf-8") as file:
@@ -23,24 +25,23 @@ BOOKING_DURATION = settings["BOOKING_DURATION"]
 SEAT_OPTION_1 = settings["SEAT_OPTION_1"]
 SEAT_OPTION_2 = settings["SEAT_OPTION_2"]
 
-if BOOK_FOR not in ("today", "tmr"):
-    raise ValueError('BOOK_FOR must be "today" or "tmr"')
-
 LOGIN_URL = "https://www.nlb.gov.sg/seatbooking/login/options"
 BOOKING_URL = "https://www.nlb.gov.sg/seatbooking/?loc=NLB.HBPL.3.ReadingLounge1Middle.{SEAT_OPTION_1}"
 
 USERNAME = os.environ.get("NLB_USERNAME") 
 PASSWORD = os.environ.get("NLB_PASSWORD")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 HEADLESS = os.environ.get("HEADLESS", "0") == "1" # For no visible window, set env: HEADLESS = value == "1"
 TIMEOUT_MS = 30_000
 SG_TIMEZONE = timezone(timedelta(hours=8))
 DATE_TODAY = datetime.now(SG_TIMEZONE).date()
 if BOOK_FOR == "today":
     BOOKING_DATE = DATE_TODAY
-elif BOOK_FOR == "tomorrow":
+elif BOOK_FOR == "tmr":
     BOOKING_DATE = DATE_TODAY + timedelta(days=1)
 else:
-    raise ValueError('BOOK_FOR must be "today" or "tomorrow"')
+    raise ValueError('BOOK_FOR must be "today" or "tmr"')
 
 
 def timestamp():

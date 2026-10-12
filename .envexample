@@ -1,0 +1,5 @@
+USERNAME=your_nlb_username
+NLB_PASSWORD=your_nlb_password
+TELEBOT_TOKEN=your_telegram_bot_token
+CHATID=your_telegram_chat_id
+HEADLESS=0
