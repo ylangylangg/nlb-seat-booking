@@ -95,7 +95,7 @@ def pick_option(page: Page, label_pattern: str, option_text: str) -> None:
 def book_seat(page: Page) -> str:
     page.goto(BOOKING_URL, wait_until="domcontentloaded")
 
-    # Date: open calendar
+    # date: open calendar
     page.get_by_role("textbox", name="Select date").click()
     if DATE_TODAY.month != BOOKING_DATE.month:
         page.get_by_role(
@@ -108,17 +108,17 @@ def book_seat(page: Page) -> str:
 
     page.get_by_role("button", name=str(BOOKING_DATE.day), exact=True).click()
 
-    # Time
+    # time
     page.get_by_role("textbox", name="Select time", exact=True).click()
     page.get_by_text(BOOKING_TIME, exact=True).click()
 
-    # Duration
+    # duration
     page.get_by_role("textbox", name="Select duration", exact=True).click()
     page.get_by_text(BOOKING_DURATION, exact=True).click()
 
     print(f"Selected for {BOOKING_DATE.strftime("%d %b")}, {BOOKING_TIME}, {BOOKING_DURATION}")
 
-    # Availability
+    # availability
     page.get_by_role(
         "button", name="Check available slots", exact=True
     ).click()
@@ -128,25 +128,25 @@ def book_seat(page: Page) -> str:
     # first_panel.click()
     # print("After result click")
 
-    # Click Book
+    # click Book
     page.get_by_role("button", name="Book", exact=True).click()
 
-    # Open seat selector
+    # open seat selector
     selection_dialog = page.get_by_role("dialog").filter(has_text="Selection")
     seat_input = selection_dialog.locator("input[readonly]")
     seat_input.click()
 
-    # Recorded seat selection:
+    # recorded seat selection:
     if page.get_by_text(f"S{SEAT_OPTION_1}", exact=True).is_visible():
         selected_seat = f"S{SEAT_OPTION_1}"
     elif page.get_by_text(f"S{SEAT_OPTION_2}", exact=True).is_visible():
         selected_seat = f"S{SEAT_OPTION_2}"
-    else:
-        selected_seat = "Any available seat"
+    else: 
+        selected_seat = "Any available seat"  # fallback
 
     page.get_by_text(selected_seat, exact=True).click()
 
-    # Book
+    # book
     page.get_by_role("button", name="Confirm", exact=True).click()
 
     return selected_seat
