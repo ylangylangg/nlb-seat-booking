@@ -33,7 +33,7 @@ PASSWORD = os.environ.get("NLB_PASSWORD")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 HEADLESS = os.environ.get("HEADLESS", "0") == "1" # For no visible window, set env: HEADLESS = value == "1"
-TIMEOUT_MS = 30_000
+TIMEOUT_MS = 300_000
 SG_TIMEZONE = timezone(timedelta(hours=8))
 DATE_TODAY = datetime.now(SG_TIMEZONE).date()
 if BOOK_FOR == "today":
@@ -123,12 +123,13 @@ def book_seat(page: Page) -> str:
         "button", name="Check available slots", exact=True
     ).click()
 
-    # print("Before result click")
-    # first_panel = page.locator(".mb-1.v-card.v-card--link").first
-    # first_panel.click()
-    # print("After result click")
+    # in case
+    login_to_book = page.get_by_role("button", name="Login to Book", exact=True)
 
-    # click Book
+    if login_to_book.is_visible():
+        login_to_book.click()
+
+    # book
     page.get_by_role("button", name="Book", exact=True).click()
 
     # open seat selector
@@ -202,7 +203,6 @@ def main() -> None:
         try:
             login(page)
             logged_in_at = timestamp()
-            send_telegram(f"login confirmed: {logged_in_at}")
 
             if BOOK_FOR == "tmr" and datetime.now(SG_TIMEZONE).hour < 12:
                 wait_until_noon()
@@ -213,7 +213,7 @@ def main() -> None:
 
             expect(
                     page.get_by_text("Booking successful!", exact=True)
-                ).to_be_visible(timeout=15_000)
+                ).to_be_visible(timeout=30_000)
 
             booked_at = timestamp()
 
@@ -250,13 +250,13 @@ def main() -> None:
                     f"{BOOKING_DATE.strftime('%d %b')}"
                 )
             else:
-                messages.append("Booking success was not confirmed.")
+                messages.append("booking success was not confirmed.")
         
             try:
                 send_telegram("\n".join(messages))
             except Exception as notification_error:
                 print(
-                    "Telegram notification failed: "
+                    "telegram notification failed: "
                     f"{type(notification_error).__name__}"
                 )
 
