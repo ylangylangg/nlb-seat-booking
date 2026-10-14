@@ -1,7 +1,7 @@
 {
-  "BOOK_FOR": "tmr",
-  "BOOKING_TIME": "1:00 pm",
-  "BOOKING_DURATION": "4:00",
+  "BOOK_FOR": "today",
+  "BOOKING_TIME": "7:00 pm",
+  "BOOKING_DURATION": "1:00",
   "SEAT_OPTION_1": 9,
   "SEAT_OPTION_2": 5
 }

@@ -114,3 +114,6 @@ These require a command handler that receives messages promptly, verifies the se
 Python · Playwright · GitHub Actions · Telegram Bot API
 
 Personal learning project; not affiliated with NLB.
+
+## TO DO:
+-[ ] send screenshot to tele

@@ -150,6 +150,9 @@ def book_seat(page: Page) -> str:
     # book
     page.get_by_role("button", name="Confirm", exact=True).click()
 
+    if selected_seat == "Any available seat":
+        return "randomly allocated seat"
+
     return selected_seat
 
 def send_telegram(message):
@@ -163,7 +166,26 @@ def send_telegram(message):
     )
 
     if not response.json().get("ok"):
-        raise RuntimeError("Telegram notification failed.")
+        raise RuntimeError("Telegram notification failed")
+
+def send_screenshot(page, caption=""):
+    token = os.environ["TELEGRAM_BOT_TOKEN"]
+    chat_id = os.environ["TELEGRAM_CHAT_ID"]
+
+    screenshot = page.screenshot(full_page=True) # can adjust later
+
+    response = response.post(
+        f"https://api.telegram/org/bot{token}/sendPhoto",
+        json={"chat_id": chat_id, "caption": caption},
+        files={"photo": ("booking.png", screenshot, "image/png"),},
+        timeout=30
+    )
+
+    response.raise_for_status()
+
+    if not response.json().get("ok"):
+        raise RuntimeError("Telegram screenshot failed")
+
 
 def wait_until_noon():
     now = datetime.now(SG_TIMEZONE)
@@ -204,13 +226,16 @@ def main() -> None:
             login(page)
             logged_in_at = timestamp()
 
+            # wait if necessary
             if BOOK_FOR == "tmr" and datetime.now(SG_TIMEZONE).hour < 12:
                 wait_until_noon()
                 page.reload(wait_until="domcontentloaded")
                 refreshed_at = timestamp()
 
+            # attempt booking
             selected_seat = book_seat(page)
 
+            # verify success
             expect(
                     page.get_by_text("Booking successful!", exact=True)
                 ).to_be_visible(timeout=30_000)
@@ -244,13 +269,22 @@ def main() -> None:
                 messages.append(f"refresh DOM loaded: {refreshed_at}")
 
             if booked_at is not None:
-                messages.append(
+                success_message = (
                     f"☆ booking successful {booked_at}: "
                     f"{selected_seat} for "
                     f"{BOOKING_DATE.strftime('%d %b')}"
                 )
+                messages.append(success_message)
+
+                try:
+                    send_screenshot(page, caption=success_message)
+
+                except Exception as error:
+                    print(f"screenshot delivery error: {error}")
+                    messages.append("booking confirmed, but screenshot delivery failed")
+
             else:
-                messages.append("booking success was not confirmed.")
+                messages.append("unable to verify booking")
         
             try:
                 send_telegram("\n".join(messages))
