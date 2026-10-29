@@ -58,7 +58,7 @@ def login(page: Page) -> None:
     print("Page title:", page.title())
     page.screenshot(path="login-debug.png", full_page=True)
 
-    username_field.fill(USERNAME)
+    username_field.fill(USERNAME, timeout=15_000)
     password_field.fill(PASSWORD)
 
     page.get_by_role("button", name="CONTINUE", exact=True).click()
