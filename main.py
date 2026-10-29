@@ -26,7 +26,7 @@ SEAT_OPTION_1 = settings["SEAT_OPTION_1"]
 SEAT_OPTION_2 = settings["SEAT_OPTION_2"]
 
 LOGIN_URL = "https://www.nlb.gov.sg/seatbooking/login/options"
-BOOKING_URL = "https://www.nlb.gov.sg/seatbooking/?loc=NLB.HBPL.3.ReadingLounge1Middle.{SEAT_OPTION_1}"
+BOOKING_URL = "https://www.nlb.gov.sg/seatbooking/?loc=NLB.HBPL.3.ReadingLounge1Upper.{SEAT_OPTION_1}"
 
 USERNAME = os.environ.get("NLB_USERNAME") 
 PASSWORD = os.environ.get("NLB_PASSWORD")
@@ -52,6 +52,11 @@ def login(page: Page) -> None:
 
     username_field = page.locator("#username")
     password_field = page.locator("#password")
+
+    # debug attempt
+    print("Current URL:", page.url)
+    print("Page title:", page.title())
+    page.screenshot(path="login-debug.png", full_page=True)
 
     username_field.fill(USERNAME)
     password_field.fill(PASSWORD)
@@ -166,7 +171,7 @@ def send_telegram(message):
     )
 
     if not response.json().get("ok"):
-        raise RuntimeError("Telegram notification failed")
+        raise RuntimeError("telegram notification failed")
 
 def send_screenshot(page, caption=""):
     token = os.environ["TELEGRAM_BOT_TOKEN"]
@@ -175,8 +180,8 @@ def send_screenshot(page, caption=""):
     screenshot = page.screenshot(full_page=True) # can adjust later
 
     response = response.post(
-        f"https://api.telegram/org/bot{token}/sendPhoto",
-        json={"chat_id": chat_id, "caption": caption},
+        f"https://api.telegram.org/bot{token}/sendPhoto",
+        data={"chat_id": chat_id, "caption": caption},
         files={"photo": ("booking.png", screenshot, "image/png"),},
         timeout=30
     )
@@ -184,14 +189,14 @@ def send_screenshot(page, caption=""):
     response.raise_for_status()
 
     if not response.json().get("ok"):
-        raise RuntimeError("Telegram screenshot failed")
+        raise RuntimeError("telegram screenshot failed")
 
 
 def wait_until_noon():
     now = datetime.now(SG_TIMEZONE)
     target = now.replace(hour=12, minute=0, second=0, microsecond=5)
 
-    print("Waiting until noon Singapore time...", flush=True)
+    print("waiting until noon SGT...", flush=True)
 
     while True:
         remaining = (target - datetime.now(SG_TIMEZONE)).total_seconds()
@@ -263,16 +268,15 @@ def main() -> None:
             messages = []
         
             if logged_in_at is not None:
-                messages.append(f"login confirmed: {logged_in_at}")
+                messages.append(f"{logged_in_at} login confirmed")
 
             if refreshed_at is not None:
                 messages.append(f"refresh DOM loaded: {refreshed_at}")
 
             if booked_at is not None:
                 success_message = (
-                    f"☆ booking successful {booked_at}: "
-                    f"{selected_seat} for "
-                    f"{BOOKING_DATE.strftime('%d %b')}"
+                    f"{booked_at} ☆ booking success ☆\n"
+                    f"Seat: {selected_seat} for {BOOKING_DATE.strftime('%d %b')}"
                 )
                 messages.append(success_message)
 
@@ -281,7 +285,7 @@ def main() -> None:
 
                 except Exception as error:
                     print(f"screenshot delivery error: {error}")
-                    messages.append("booking confirmed, but screenshot delivery failed")
+                    messages.append("\nbooking confirmed, but screenshot delivery failed")
 
             else:
                 messages.append("unable to verify booking")

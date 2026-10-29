@@ -35,3 +35,10 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           HEADLESS: "1"
         run: python -u main.py
+
+      - name: Upload login screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-debug
+          path: login-debug.png
