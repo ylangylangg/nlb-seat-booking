@@ -1,6 +1,6 @@
 # NLB Seat-Booking Automation
 
-Personal Python project that books library seats on the National Library Board (NLB) website with Playwright and sends progress updates via Telegram. Not affiliated with NLB.
+Personal Python project for booking library seats on the National Library Board (NLB) website with Playwright and sends progress updates via Telegram. Not affiliated with NLB.
 
 ## Tech
 Python, Playwright, Telegram Bot API, GitHub Actions
@@ -35,13 +35,10 @@ Copy `settings.example.json` to `settings.json` and edit it:
 | Setting | Example | Purpose |
 | --- | --- | --- |
 | `BOOK_FOR` | `"tomorrow"` | Choose `"today"` or `"tomorrow"` |
-| `SEAT_OPTION_1` | `9` | Preferred seat; the selector adds `S` |
-| `SEAT_OPTION_2` | `5` | Backup seat |
-| `TIME_OPTION` | `"1:00 pm"` | Start time matching the website label |
+| `SEAT_OPTION_1` | `8` | Preferred seat; the selector adds `S` |
+| `SEAT_OPTION_2` | `3` | Backup seat |
+| `TIME_OPTION` | `"12:00 pm"` | Start time matching the website label |
 | `DURATION_OPTION` | `"4:00"` | Duration matching the website label |
-| `BOOKING_URL` | NLB seat-booking URL | Library location and booking page |
-
-Bookings set for 'today' skip the noon wait, but the chosen time must still be available.
 
 ## Library
 The script targets HarbourFront Library (HBPL) Seats in the Upper Tier:
@@ -51,14 +48,14 @@ BOOKING_URL = "https://www.nlb.gov.sg/seatbooking/?loc=NLB.HBPL.3.ReadingLounge1
 To use another library, find its location code and update the URL. You could also build your own library selector, but that isn't needed for now.
 
 ## Booking Flow
-1. Opens Chromium, logs in to NLB.
-2. If booking tomorrow before noon, wait until 12:00 PM SGT.
-3. book_seat() loads the booking page (page.goto())
+1. Opens Chromium, logs in to NLB account.
+2. If booking for tomorrow & before noon, wait until 12:00 PM SGT before continuing. (Slots for following day are only released at noon)
+3. book_seat() loads the booking page (page.goto()).
 4. Selects date, time and duration; picks a seat by preference order.
 5. Submits, verifies the success message, sends the Telegram notification, closes the browser.
 
 ## GitHub Actions (currently not working)
-NLB returns HTTP 403 to GitHub Actions runners, so scheduled runs fail. The intended setup is a workflow at `.github/workflows/nlb-booking.yml` that installs dependencies and runs `main.py`, with credentials stored as repository secrets and a schedule of `55 3 * * *` (11:55 AM SGT) to allow for setup before noon. GitHub schedules are often delayed though, so timing is not guaranteed.
+NLB returns HTTP 403 to GitHub Actions runners, so the scheduled runs fail. The intended setup is a workflow at `.github/workflows/nlb-booking.yml` that installs dependencies and runs `main.py`, with credentials stored as repository secrets and a schedule of `55 3 * * *` (11:55 AM SGT) to allow for setup before noon. GitHub schedules are often delayed, so timing is not guaranteed.
 
 ## Notes
 - Timestamps are recorded and sent after booking attempt, for no network delays.
@@ -66,5 +63,5 @@ NLB returns HTTP 403 to GitHub Actions runners, so scheduled runs fail. The inte
 
 ## Planned Extensions
 -[ ] Send successful booking screenshot to Telegram
--[ ] Set up cloud VM so it runs without manual triggers
--[ ] Implement Telegram commands like `/book_now` or `/skip_tomorrow`(need an always-on handler that verifies the sender):
+-[ ] Set up cloud VM so it runs without manual triggers - but data center IP address may be blocked too
+-[ ] Implement Telegram commands like `/book_now` or `/skip_tomorrow`(requires an always-on handler that verifies the sender)
