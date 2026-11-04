@@ -41,7 +41,7 @@ Copy `settings.example.json` to `settings.json` and edit it:
 | `DURATION_OPTION` | `"4:00"` | Duration matching the website label |
 | `BOOKING_URL` | NLB seat-booking URL | Library location and booking page |
 
-Today's bookings skip the noon wait, but the chosen time must still be available.
+Bookings set for 'today' skip the noon wait, but the chosen time must still be available.
 
 ## Library
 The script targets HarbourFront Library (HBPL) Seats in the Upper Tier:
@@ -53,7 +53,7 @@ To use another library, find its location code and update the URL. You could als
 ## Booking Flow
 1. Opens Chromium, logs in to NLB.
 2. If booking tomorrow before noon, wait until 12:00 PM SGT.
-3. book_seat() loads the booking page (page.goto()), so no separate refresh is needed.
+3. book_seat() loads the booking page (page.goto())
 4. Selects date, time and duration; picks a seat by preference order.
 5. Submits, verifies the success message, sends the Telegram notification, closes the browser.
 

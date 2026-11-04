@@ -53,11 +53,6 @@ def login(page: Page) -> None:
     username_field = page.locator("#username")
     password_field = page.locator("#password")
 
-    # debug attempt
-    print("Current URL:", page.url)
-    print("Page title:", page.title())
-    page.screenshot(path="login-debug.png", full_page=True)
-
     username_field.fill(USERNAME, timeout=15_000)
     password_field.fill(PASSWORD)
 
@@ -209,7 +204,6 @@ def wait_until_noon():
 def main() -> None:
     script_started_at = timestamp()
     logged_in_at = None
-    refreshed_at = None
     booked_at = None
     
     if not USERNAME or not PASSWORD:
@@ -234,8 +228,6 @@ def main() -> None:
             # wait if necessary
             if BOOK_FOR == "tmr" and datetime.now(SG_TIMEZONE).hour < 12:
                 wait_until_noon()
-                page.reload(wait_until="domcontentloaded")
-                refreshed_at = timestamp()
 
             # attempt booking
             selected_seat = book_seat(page)
@@ -269,9 +261,6 @@ def main() -> None:
         
             if logged_in_at is not None:
                 messages.append(f"{logged_in_at} login confirmed")
-
-            if refreshed_at is not None:
-                messages.append(f"refresh DOM loaded: {refreshed_at}")
 
             if booked_at is not None:
                 success_message = (
