@@ -3,3 +3,4 @@
 __pycache__/
 *.py[cod]
 booking_log.csv
+settings.json
